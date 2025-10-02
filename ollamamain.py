@@ -9,6 +9,7 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 from sentence_transformers import SentenceTransformer
 from dotenv import load_dotenv
 import requests
+from ollama import Client
 
 
 class FinancialComplianceRAG:
@@ -157,41 +158,26 @@ class FinancialComplianceRAG:
             rag_context += f"{r['text']} \n\n"
             count += 1
 
-        url = "https://openrouter.ai/api/v1/chat/completions"
-        headers = {
-            "Authorization": f"Bearer {self.openrouter_key}",
-            "Content-Type": "application/json",
-        }
+        client=Client()
 
-        payload = {
-            "model": "x-ai/grok-4-fast:free",
-            "messages": [
-                {"role": "user", "content": f"""
+        chat_response = client.chat(
+            model= "deepseek-r1:1.5b",
+            messages= [
+                {"role": "user",
+                 "content": f"""
                     You are a financial and legal compliance assistant. Answer the question using the provided RAG context ONLY. Always cite the source.
                     If relevant context is not provided- say "Relevant information not found in database." and also provide the most relevant chunk found in the database.
                     Question: {user_question}
                     Context: {rag_context}
-            """}
-            ]
-        }
+                    """
+                }
+            ],
+            think=False
+        )
 
         try:
-            response = requests.post(url, headers=headers, data=json.dumps(payload))
-            response.raise_for_status()
-            response_data = response.json()
-
-            model_reply = response_data["choices"][0]["message"]["content"]
+            model_reply = chat_response["message"]["content"]
             return model_reply
-
-        except requests.exceptions.RequestException as e:
-            print(f"An error occurred during the API request: {e}")
-            if hasattr(e, 'response') and e.response is not None:
-                print(f"Response content: {e.response.text}")
-            return "Error occurred during API request."
-        except json.JSONDecodeError:
-            print("Failed to decode JSON response.")
-            print(f"Raw response content: {response.text}")
-            return "Error decoding response from API."
         except Exception as e:
             print(f"An unexpected error occurred: {e}")
             return "Unexpected error occurred."
